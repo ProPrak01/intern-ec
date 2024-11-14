@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "templatern",
+    "slug": "template-rn-appwrite",
+    "scheme": "template-rn-appwrite",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "package": "com.aora.appwrite",
+      "bundleIdentifier": "com.android.hudApp"
+    },
+    "android": {
+      "permissions": [
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff",
+        "package": "com.aora.android"
+      },
+      "package": "com.android.hudApp"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-router"
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "abdb2c76-9559-41fc-b1db-d78b540543fc"
+      }
+    }
+  }
+}
