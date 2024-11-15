@@ -1,10 +1,10 @@
 import React, { useEffect } from "react";
-import { Text, View } from "react-native";
+import { Text, View, ActivityIndicator } from "react-native";
 import { useFonts } from "expo-font";
 import { SplashScreen, Stack } from "expo-router";
 import { ThemeProvider } from "../context/ThemeProvider";
 
-import GlobalProvider from "../context/GlobalProvider";
+import GlobalProvider, { useGlobalContext } from "../context/GlobalProvider";
 SplashScreen.preventAutoHideAsync();
 const RooyLayout = () => {
   const [fontsLoaded, error] = useFonts({
@@ -19,6 +19,8 @@ const RooyLayout = () => {
     "Poppins-Thin": require("../assets/fonts/Poppins-Thin.ttf"),
   });
 
+ // const { isLoading } = useGlobalContext();
+
   useEffect(() => {
     if (error) throw error;
 
@@ -30,6 +32,14 @@ const RooyLayout = () => {
   if (!fontsLoaded && !error) {
     return null;
   }
+
+  // if (isLoading) {
+  //   return (
+  //     <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+  //       <ActivityIndicator size="large" />
+  //     </View>
+  //   );
+  // }
 
   return (
     <ThemeProvider>

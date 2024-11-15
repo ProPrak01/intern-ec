@@ -5,36 +5,30 @@ import { images } from "../../constants";
 import FormField from "../../components/FormField";
 import CustomButton from "../../components/customButton";
 import { Link, router } from "expo-router";
-import { createUser } from "../../lib/appwrite";
 import { useGlobalContext } from "../../context/GlobalProvider";
 import { useTheme } from "../../context/ThemeProvider";
 
 const SignUp = () => {
   const { colors } = useTheme();
-  console.log(colors);
-  const { setUser, setIsLoggedIn } = useGlobalContext();
+  const { registerUser } = useGlobalContext();
   const [isSubmitted, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
-    username: "",
+    name: "",
     email: "",
     password: "",
+    phone: "",
   });
+
   const submit = async () => {
-    if (form.username === "" || form.email === "" || form.password === "") {
-      Alert.alert("Error", "Please fill in all fields");
+    if (!form.name || !form.email || !form.password || !form.phone) {
+      return Alert.alert("Error", "Please fill in all fields");
     }
+
     setSubmitting(true);
     try {
-      // console.log('pressed');
-      console.log("working1s");
-      const result = await createUser(form.email, form.password, form.username);
-      setUser(result);
-      setIsLoggedIn(true);
-      console.log("working2s");
-      //  console.log('pressesd2');
-      //use it in global state::
-
+      await registerUser(form);
+      Alert.alert("Success", "Account created successfully");
       router.replace("/home");
     } catch (error) {
       Alert.alert("Error", error.message);
@@ -42,6 +36,7 @@ const SignUp = () => {
       setSubmitting(false);
     }
   };
+
   return (
     <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
       <ScrollView>
@@ -62,10 +57,9 @@ const SignUp = () => {
           </Text>
           <FormField
             title="Name"
-            value={form.username}
-            handleChangeText={(e) => setForm({ ...form, username: e })}
+            value={form.name}
+            handleChangeText={(e) => setForm({ ...form, name: e })}
             otherStyles="mt-10"
-            keyboardType="email-address"
           />
 
           <FormField
@@ -77,11 +71,21 @@ const SignUp = () => {
           />
 
           <FormField
+            title="Phone"
+            value={form.phone}
+            handleChangeText={(e) => setForm({ ...form, phone: e })}
+            otherStyles="mt-7"
+            keyboardType="phone-pad"
+          />
+
+          <FormField
             title="Password"
             value={form.password}
             handleChangeText={(e) => setForm({ ...form, password: e })}
             otherStyles="mt-7"
+            secureTextEntry
           />
+
           <CustomButton
             title="Sign Up"
             handlePress={submit}

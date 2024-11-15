@@ -5,32 +5,28 @@ import { images } from "../../constants";
 import FormField from "../../components/FormField";
 import CustomButton from "../../components/customButton";
 import { Link, router } from "expo-router";
-import { getCurrentUser, signIn } from "../../lib/appwrite";
 import { useGlobalContext } from "../../context/GlobalProvider";
 import { useTheme } from "../../context/ThemeProvider";
 
 const SignIn = () => {
   const { colors } = useTheme();
-  console.log(colors);
-  const { setUser, setIsLoggedIn } = useGlobalContext();
+  const { loginUser } = useGlobalContext();
   const [isSubmitted, setisSubmitted] = useState(false);
 
   const [form, setForm] = useState({
     email: "",
     password: "",
   });
+
   const submit = async () => {
     if (form.email === "" || form.password === "") {
-      Alert.alert("Error", "Please fill in all fields");
+      return Alert.alert("Error", "Please fill in all fields");
     }
+
     setisSubmitted(true);
     try {
-      await signIn(form.email, form.password);
-      const result = await getCurrentUser();
-      setUser(result);
-      setIsLoggedIn(true);
-      Alert.alert("Success", "User signed in successfully");
-
+      await loginUser(form.email, form.password);
+      Alert.alert("Success", "Signed in successfully");
       router.replace("/home");
     } catch (error) {
       Alert.alert("Error", error.message);
@@ -38,6 +34,7 @@ const SignIn = () => {
       setisSubmitted(false);
     }
   };
+
   return (
     <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
       <ScrollView>
