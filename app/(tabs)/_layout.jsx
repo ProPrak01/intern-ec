@@ -5,17 +5,21 @@ import { icons } from "../../constants";
 
 const TabIcon = ({ icon, color, name, focused }) => {
   return (
-    <View className={"items-center justify-center gap-2"}>
+    <View
+      className={`items-center justify-center ${
+        focused ? "opacity-100" : "opacity-70"
+      }`}
+    >
       <Image
         source={icon}
         resizeMode="contain"
         tintColor={color}
-        className="w-6 h-6"
+        className={`w-[24px] h-[24px] ${focused ? "scale-110" : "scale-100"}`}
       />
       <Text
         className={`${
-          focused ? "font-psemibold text-[#000000]" : "font-pregular text-white"
-        } text-xs`}
+          focused ? "font-semibold text-primary" : "font-regular text-gray-400"
+        } text-[10px] mt-1`}
       >
         {name}
       </Text>
@@ -29,13 +33,17 @@ const TabsLayout = () => {
       <Tabs
         screenOptions={{
           tabBarShowLabel: false,
-          tabBarActiveTintColor: "#000000",
-          tabBarInactiveTintColor: "#FFFFFF",
+          tabBarActiveTintColor: "#007AFF",
+          tabBarInactiveTintColor: "#8E8E93",
           tabBarStyle: {
-            backgroundColor: "#3C3D37",
+            backgroundColor: "#FFFFFF",
             borderTopWidth: 1,
-            borderTopColor: "#232533",
-            height: 86,
+            borderTopColor: "#E5E5E5",
+            height: 65,
+            paddingBottom: 8,
+            paddingTop: 8,
+            elevation: 0,
+            shadowOpacity: 0,
           },
         }}
       >
@@ -109,6 +117,21 @@ const TabsLayout = () => {
                 icon={icons.profile}
                 color={color}
                 name={"Page3"}
+                focused={focused}
+              />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="contacts"
+          options={{
+            title: "Contacts",
+            headerShown: false,
+            tabBarIcon: ({ color, focused }) => (
+              <TabIcon
+                icon={icons.contacts}
+                color={color}
+                name={"Contacts"}
                 focused={focused}
               />
             ),
