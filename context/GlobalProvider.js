@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-const API_URL = "http://192.168.8.103:6000/api/users";
+const API_URL = "http://10.42.187.225:6000/api/users";
 
 const GlobalContext = createContext();
 export const useGlobalContext = () => useContext(GlobalContext);
@@ -38,13 +38,13 @@ const GlobalProvider = ({ children }) => {
         body: JSON.stringify({ email, password }),
       });
       const data = await response.json();
-      
+
       if (!response.ok) {
         throw new Error(data.message);
       }
 
-      if (data.status === 'inactive') {
-        throw new Error('Account is inactive. Please contact administrator.');
+      if (data.status === "inactive") {
+        throw new Error("Account is inactive. Please contact administrator.");
       }
 
       await AsyncStorage.setItem("user", JSON.stringify(data));
@@ -68,7 +68,7 @@ const GlobalProvider = ({ children }) => {
           email: formData.email,
           password: formData.password,
           phone: formData.phone,
-          role: "Partner",
+          role: "SuperAdmin",
         }),
       });
       const data = await response.json();

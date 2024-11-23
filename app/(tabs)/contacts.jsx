@@ -75,7 +75,7 @@ const ContactsScreen = () => {
       //   console.log('Test endpoint response:', testData);
 
       // Now fetch actual leads
-      const leadsResponse = await fetch("http://192.168.8.103:6000/api/leads", {
+      const leadsResponse = await fetch("http://10.42.187.225:6000/api/leads", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -173,6 +173,12 @@ const ContactsScreen = () => {
           style={{ color: colors.secondary }}
         >
           {item.phoneNumber}
+        </Text>
+        <Text
+          className="text-xs font-pregular mt-1"
+          style={{ color: colors.secondary }}
+        >
+          Email: {item.email}
         </Text>
         <Text
           className="text-xs font-pregular mt-1"
