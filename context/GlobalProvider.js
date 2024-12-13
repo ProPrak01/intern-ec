@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-const API_URL = "http://10.42.187.225:6000/api/users";
+const API_URL = "http://10.42.186.126:6000/api/users";
 
 const GlobalContext = createContext();
 export const useGlobalContext = () => useContext(GlobalContext);

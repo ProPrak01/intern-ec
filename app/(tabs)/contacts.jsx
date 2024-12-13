@@ -1,27 +1,69 @@
 import React, { useState, useEffect } from "react";
 import {
+  SafeAreaView,
   View,
   Text,
-  FlatList,
-  ActivityIndicator,
+  TextInput,
   TouchableOpacity,
-  Alert,
+  FlatList,
+  StyleSheet,
+  Platform,
+  Linking,
+  ActivityIndicator,
 } from "react-native";
 import * as Contacts from "expo-contacts";
-import { useTheme } from "../../context/ThemeProvider";
-import { SafeAreaView } from "react-native-safe-area-context";
+import * as FileSystem from "expo-file-system";
+import * as MediaLibrary from "expo-media-library";
+import { Audio } from "expo-av";
 import { useGlobalContext } from "../../context/GlobalProvider";
+import { useTheme } from "../../context/ThemeProvider";
+import { AppState } from "react-native";
 
-const ContactsScreen = () => {
+export default function Call() {
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [contacts, setContacts] = useState([]);
   const [leads, setLeads] = useState([]);
+  const [recentCalls, setRecentCalls] = useState([]);
+  const [recording, setRecording] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("phone"); // 'phone' or 'leads'
+  const [activeTab, setActiveTab] = useState("contacts"); // 'contacts', 'leads', or 'recent'
+  const [callStartTime, setCallStartTime] = useState(null);
+  const [appState, setAppState] = useState(AppState.currentState);
+  const [activeCall, setActiveCall] = useState(null);
   const { colors } = useTheme();
   const { user } = useGlobalContext();
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (
+        appState === "background" &&
+        nextAppState === "active" &&
+        activeCall
+      ) {
+        // App came back to foreground, call probably ended
+        const endTime = new Date();
+        const duration = Math.round((endTime - activeCall.startTime) / 1000); // duration in seconds
 
-  // Fetch phone contacts
-  const fetchPhoneContacts = async () => {
+        setRecentCalls((prevCalls) => {
+          const updatedCalls = [...prevCalls];
+          const lastCall = updatedCalls[0];
+          if (lastCall && lastCall.number === activeCall.number) {
+            lastCall.endTime = endTime;
+            lastCall.duration = duration;
+          }
+          return updatedCalls;
+        });
+
+        setActiveCall(null);
+      }
+      setAppState(nextAppState);
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [appState, activeCall]);
+  // Fetch contacts
+  const fetchContacts = async () => {
     try {
       const { status } = await Contacts.requestPermissionsAsync();
       if (status === "granted") {
@@ -42,40 +84,13 @@ const ContactsScreen = () => {
       }
     } catch (error) {
       console.error("Error fetching contacts:", error);
-      Alert.alert("Error", "Failed to fetch phone contacts");
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Fetch leads from backend
+  // Fetch leads
   const fetchLeads = async () => {
     try {
-      console.log("Fetching leads with user:", user);
-
-      // First check user status
-      if (user.status === "inactive") {
-        Alert.alert(
-          "Account Inactive",
-          "Your account is currently inactive. Please contact the administrator.",
-          [{ text: "OK" }]
-        );
-        setLoading(false);
-        return;
-      }
-
-      //   const response = await fetch('http://192.168.8.103:6000/api/leads/test-user-leads', {
-      //     method: 'GET',
-      //     headers: {
-      //       'Authorization': `Bearer ${user.token}`
-      //     }
-      //   });
-
-      //   const testData = await response.json();
-      //   console.log('Test endpoint response:', testData);
-
-      // Now fetch actual leads
-      const leadsResponse = await fetch("http://10.42.187.225:6000/api/leads", {
+      const leadsResponse = await fetch("http://10.42.186.126:6000/api/leads", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -89,63 +104,79 @@ const ContactsScreen = () => {
       });
 
       const data = await leadsResponse.json();
-      console.log("Leads response:", data);
-
       if (!leadsResponse.ok) throw new Error(data.message);
       setLeads(data.leads);
     } catch (error) {
       console.error("Error fetching leads:", error);
-      Alert.alert("Error", error.message || "Failed to fetch leads");
     } finally {
       setLoading(false);
-    }   
+    }
   };
 
-  useEffect(() => {
-    fetchPhoneContacts();
-    fetchLeads();
-  }, []);
+  // Make a call
+  const makeCall = async (number, contactType, contact) => {
+    try {
+      if (!number) {
+        alert("Please enter a phone number");
+        return;
+      }
+
+      const startTime = new Date();
+
+      // Create new call record
+      const newCall = {
+        number,
+        startTime,
+        timestamp: startTime,
+        contactType,
+        contact,
+        duration: 0,
+        endTime: null,
+      };
+
+      setActiveCall(newCall);
+      setRecentCalls((prev) => [newCall, ...prev].slice(0, 50));
+
+      await Linking.openURL(`tel:${number}`);
+    } catch (error) {
+      console.error("Call failed", error);
+      alert("Failed to make call");
+    }
+  };
 
   const TabButton = ({ title, isActive, onPress }) => (
     <TouchableOpacity
       onPress={onPress}
-      className={`flex-1 py-2 ${isActive ? "border-b-2 border-blue-500" : ""}`}
+      style={[
+        styles.tabButton,
+        isActive && { borderBottomColor: colors.primary, borderBottomWidth: 2 },
+      ]}
     >
       <Text
-        className={`text-center font-pmedium ${
-          isActive ? "text-blue-500" : ""
-        }`}
-        style={{ color: isActive ? colors.primary : colors.secondary }}
+        style={[
+          styles.tabText,
+          { color: isActive ? colors.primary : colors.secondary },
+        ]}
       >
         {title}
       </Text>
     </TouchableOpacity>
   );
 
-  const renderPhoneContact = ({ item }) => (
+  const renderContact = ({ item }) => (
     <TouchableOpacity
-      className="flex-row items-center p-4 mb-2 rounded-lg"
-      style={{ backgroundColor: colors.card }}
+      style={styles.contactItem}
+      onPress={() => makeCall(item.phoneNumbers?.[0]?.number, "contact", item)}
     >
-      <View className="w-12 h-12 rounded-full bg-blue-500 items-center justify-center mr-4">
-        <Text className="text-white text-lg font-psemibold">
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>
           {(item.name || "?")[0].toUpperCase()}
         </Text>
       </View>
-      <View className="flex-1">
-        <Text
-          className="text-base font-pmedium mb-1"
-          style={{ color: colors.text }}
-        >
-          {item.name}
-        </Text>
-        {item.phoneNumbers && item.phoneNumbers[0] && (
-          <Text
-            className="text-sm font-pregular"
-            style={{ color: colors.secondary }}
-          >
-            {item.phoneNumbers[0].number}
-          </Text>
+      <View style={styles.contactInfo}>
+        <Text style={styles.contactName}>{item.name}</Text>
+        {item.phoneNumbers?.[0] && (
+          <Text style={styles.phoneNumber}>{item.phoneNumbers[0].number}</Text>
         )}
       </View>
     </TouchableOpacity>
@@ -153,86 +184,197 @@ const ContactsScreen = () => {
 
   const renderLead = ({ item }) => (
     <TouchableOpacity
-      className="flex-row items-center p-4 mb-2 rounded-lg"
-      style={{ backgroundColor: colors.card }}
+      style={styles.contactItem}
+      onPress={() => makeCall(item.phoneNumber, "lead", item)}
     >
-      <View className="w-12 h-12 rounded-full bg-blue-500 items-center justify-center mr-4">
-        <Text className="text-white text-lg font-psemibold">
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>
           {(item.name || "?")[0].toUpperCase()}
         </Text>
       </View>
-      <View className="flex-1">
-        <Text
-          className="text-base font-pmedium mb-1"
-          style={{ color: colors.text }}
-        >
-          {item.name}
-        </Text>
-        <Text
-          className="text-sm font-pregular"
-          style={{ color: colors.secondary }}
-        >
-          {item.phoneNumber}
-        </Text>
-        <Text
-          className="text-xs font-pregular mt-1"
-          style={{ color: colors.secondary }}
-        >
-          Email: {item.email}
-        </Text>
-        <Text
-          className="text-xs font-pregular mt-1"
-          style={{ color: colors.secondary }}
-        >
+      <View style={styles.contactInfo}>
+        <Text style={styles.contactName}>{item.name}</Text>
+        <Text style={styles.phoneNumber}>{item.phoneNumber}</Text>
+        <Text style={styles.leadDetails}>
           Status: {item.status} • Priority: {item.priority}
+        </Text>
+        <Text style={styles.leadDetails}>Email: {item.email}</Text>
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderRecentCall = ({ item }) => (
+    <TouchableOpacity
+      style={styles.contactItem}
+      onPress={() => makeCall(item.number, item.contactType, item.contact)}
+    >
+      <View style={styles.avatar}>
+        <Text style={styles.avatarText}>
+          {(item.contact?.name || "?")[0].toUpperCase()}
+        </Text>
+      </View>
+      <View style={styles.contactInfo}>
+        <Text style={styles.contactName}>
+          {item.contact?.name || item.number}
+        </Text>
+        <Text style={styles.phoneNumber}>{item.number}</Text>
+        <Text style={styles.callTime}>
+          {new Date(item.timestamp).toLocaleString()}
+          {item.duration ? ` • ${item.duration}s` : ""}
         </Text>
       </View>
     </TouchableOpacity>
   );
 
-  if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center">
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
+  useEffect(() => {
+    fetchContacts();
+    fetchLeads();
+  }, []);
 
   return (
-    <SafeAreaView
-      className="flex-1"
-      style={{ backgroundColor: colors.background }}
-    >
-      <Text
-        className="text-2xl font-psemibold px-4 pt-4"
-        style={{ color: colors.text }}
-      >
-        Contacts
-      </Text>
+    <SafeAreaView style={styles.container}>
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter phone number"
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          keyboardType="phone-pad"
+        />
+        <TouchableOpacity
+          style={styles.callButton}
+          onPress={() => makeCall(phoneNumber)}
+        >
+          <Text style={styles.buttonText}>Call</Text>
+        </TouchableOpacity>
+      </View>
 
-      {/* Tab Switcher */}
-      <View className="flex-row mx-4 mt-4 mb-2">
+      <View style={styles.tabContainer}>
         <TabButton
-          title="Phone Contacts"
-          isActive={activeTab === "phone"}
-          onPress={() => setActiveTab("phone")}
+          title="Contacts"
+          isActive={activeTab === "contacts"}
+          onPress={() => setActiveTab("contacts")}
         />
         <TabButton
           title="Leads"
           isActive={activeTab === "leads"}
           onPress={() => setActiveTab("leads")}
         />
+        <TabButton
+          title="Recent"
+          isActive={activeTab === "recent"}
+          onPress={() => setActiveTab("recent")}
+        />
       </View>
 
-      <FlatList
-        data={activeTab === "phone" ? contacts : leads}
-        renderItem={activeTab === "phone" ? renderPhoneContact : renderLead}
-        keyExtractor={(item) => item.id || item._id}
-        contentContainerStyle={{ padding: 16 }}
-        className="flex-1"
-      />
+      {loading ? (
+        <ActivityIndicator size="large" color={colors.primary} />
+      ) : (
+        <FlatList
+          data={
+            activeTab === "contacts"
+              ? contacts
+              : activeTab === "leads"
+              ? leads
+              : recentCalls
+          }
+          renderItem={
+            activeTab === "contacts"
+              ? renderContact
+              : activeTab === "leads"
+              ? renderLead
+              : renderRecentCall
+          }
+          keyExtractor={(item, index) => item.id || item._id || `${index}`}
+        />
+      )}
     </SafeAreaView>
   );
-};
+}
 
-export default ContactsScreen;
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  inputContainer: {
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  input: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    marginRight: 8,
+  },
+  callButton: {
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  buttonText: {
+    color: "#fff",
+    fontWeight: "bold",
+  },
+  tabContainer: {
+    flexDirection: "row",
+    borderBottomWidth: 1,
+    borderBottomColor: "#ddd",
+  },
+  tabButton: {
+    flex: 1,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  tabText: {
+    fontSize: 16,
+    fontWeight: "500",
+  },
+  contactItem: {
+    flexDirection: "row",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    alignItems: "center",
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: "#007AFF",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  avatarText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "bold",
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  phoneNumber: {
+    color: "#666",
+    marginBottom: 2,
+  },
+  leadDetails: {
+    color: "#666",
+    fontSize: 12,
+  },
+  callTime: {
+    color: "#999",
+    fontSize: 12,
+    marginTop: 2,
+  },
+});

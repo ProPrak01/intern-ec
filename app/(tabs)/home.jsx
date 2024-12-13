@@ -20,7 +20,7 @@ const Home = () => {
     try {
       if (user.status === "inactive") return;
 
-      const leadsResponse = await fetch("http://10.42.187.225:6000/api/leads", {
+      const leadsResponse = await fetch("http://10.42.186.126:6000/api/leads", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
