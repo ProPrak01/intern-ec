@@ -23,6 +23,7 @@ import CallLog from "react-native-call-log";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Alert } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import RNImmediatePhoneCall from "react-native-immediate-phone-call";
 
 const API_CONFIG = {
   BASE_URL: "https://crm-s1.amiigo.in/api",
@@ -163,6 +164,25 @@ export default function Call() {
         return;
       }
 
+      // Request permission on Android
+      if (Platform.OS === "android") {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CALL_PHONE,
+          {
+            title: "Phone Call Permission",
+            message: "This app needs access to make phone calls",
+            buttonNeutral: "Ask Me Later",
+            buttonNegative: "Cancel",
+            buttonPositive: "OK",
+          }
+        );
+
+        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+          alert("Permission denied to make phone calls");
+          return;
+        }
+      }
+
       const startTime = new Date();
 
       // Create new call record
@@ -179,7 +199,8 @@ export default function Call() {
       setActiveCall(newCall);
       setRecentCalls((prev) => [newCall, ...prev].slice(0, 50));
 
-      await Linking.openURL(`tel:${number}`);
+      // Use RNImmediatePhoneCall instead of Linking
+      RNImmediatePhoneCall.immediatePhoneCall(number.replace(/\D/g, "")); // Remove non-numeric characters
     } catch (error) {
       console.error("Call failed", error);
       alert("Failed to make call");
@@ -188,13 +209,13 @@ export default function Call() {
 
   const TabButton = ({ title, isActive, onPress }) => {
     const { colors } = useTheme();
-    
+
     return (
       <TouchableOpacity
         onPress={onPress}
         className={`flex-1 py-3 px-4 mx-1 rounded-full items-center ${
-          isActive 
-            ? "bg-white dark:bg-gray-800 border-2 border-primary shadow-sm" 
+          isActive
+            ? "bg-white dark:bg-gray-800 border-2 border-primary shadow-sm"
             : "bg-gray-100/50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700"
         }`}
         style={{
