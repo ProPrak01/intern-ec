@@ -1,11 +1,91 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, Image, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Image,
+  ScrollView,
+  RefreshControl,
+  Alert,
+  StatusBar,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../../context/ThemeProvider";
 import { useGlobalContext } from "../../context/GlobalProvider";
 import { router } from "expo-router";
 import { icons } from "../../constants";
 import { LinearGradient } from "expo-linear-gradient";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const API_CONFIG = {
+  BASE_URL: "https://crm-s1.amiigo.in/api",
+  ENDPOINTS: {
+    FETCH_LEADS: "/leads/fetch",
+  },
+};
+
+const StatCard = ({ title, value, color }) => (
+  <View
+    className="flex-1 px-4 py-5 rounded-xl bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 mx-1"
+    style={{
+      elevation: 2,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.1,
+      shadowRadius: 2,
+    }}
+  >
+    <Text className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+      {title}
+    </Text>
+    <Text className={`text-2xl font-semibold ${color}`}>{value}</Text>
+  </View>
+);
+
+const QuickActionCard = ({
+  title,
+  description,
+  icon,
+  onPress,
+  gradientColors,
+}) => {
+  const { colors } = useTheme();
+
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className="w-[48%] rounded-xl overflow-hidden mb-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700"
+      style={{
+        elevation: 2,
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.1,
+        shadowRadius: 2,
+      }}
+    >
+      <LinearGradient
+        colors={gradientColors}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        className="p-5 h-44"
+      >
+        <View className="w-12 h-12 rounded-full bg-gray-50 dark:bg-gray-700 items-center justify-center mb-4 border border-gray-100 dark:border-gray-600">
+          <Image
+            source={icon}
+            className="w-6 h-6"
+            style={{ tintColor: colors.secondary }}
+          />
+        </View>
+        <Text className="text-lg font-semibold text-gray-800 dark:text-white mb-2">
+          {title}
+        </Text>
+        <Text className="text-sm text-gray-600 dark:text-gray-300">
+          {description}
+        </Text>
+      </LinearGradient>
+    </TouchableOpacity>
+  );
+};
 
 const Home = () => {
   const { colors } = useTheme();
@@ -15,31 +95,37 @@ const Home = () => {
     active: 0,
     converted: 0,
   });
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchLeadsStats = async () => {
     try {
-      if (user.status === "inactive") return;
+      // if (!user || user.status === "inactive") return;
 
-      const leadsResponse = await fetch("http://10.42.186.126:6000/api/leads", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${user.token}`,
-        },
-        body: JSON.stringify({
-          page: 1,
-          limit: 50,
-          unassigned: false,
-        }),
-      });
+      const token = await AsyncStorage.getItem("token");
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.FETCH_LEADS}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            page: 1,
+            limit: 50,
+            unassigned: false,
+          }),
+        }
+      );
 
-      const data = await leadsResponse.json();
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message);
 
-      if (leadsResponse.ok && data.leads) {
+      if (data.leads) {
         // Calculate stats from leads data
         const totalLeads = data.leads.length;
         const activeLeads = data.leads.filter(
-          (lead) => lead.status === "pending"
+          (lead) => lead.status === "pending" || lead.status === "contacted"
         ).length;
         const convertedLeads = data.leads.filter(
           (lead) => lead.status === "converted"
@@ -53,12 +139,19 @@ const Home = () => {
       }
     } catch (error) {
       console.error("Error fetching leads stats:", error);
+      Alert.alert("Error", "Failed to fetch leads statistics");
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchLeadsStats();
+    setRefreshing(false);
   };
 
   useEffect(() => {
     fetchLeadsStats();
-  }, []);
+  }, [user]);
 
   const navigationCards = [
     {
@@ -66,187 +159,115 @@ const Home = () => {
       description: "Manage your contacts and leads",
       icon: icons.chat,
       route: "/contacts",
-      gradientColors: ["#4ade80", "#22c55e"],
-      bgColor: "#4ade80" + "15",
+      gradientColors: [colors.primary + "20", colors.primary + "10"],
     },
     {
       title: "Profile",
       description: "View and edit your profile",
       icon: icons.profile,
       route: "/profile",
-      gradientColors: ["#818cf8", "#6366f1"],
-      bgColor: "#6366f1" + "15",
+      gradientColors: [colors.primary + "20", colors.primary + "10"],
     },
   ];
 
   return (
-    <SafeAreaView
-      style={{ backgroundColor: colors.background }}
-      className="flex-1"
-    >
-      {/* Enhanced Header Section */}
-      <View className="p-6">
-        <Text
-          className="text-base font-pmedium mb-1 opacity-80"
-          style={{ color: colors.text }}
+    <SafeAreaView className="flex-1 bg-gray-50 dark:bg-gray-900">
+      <StatusBar style="auto" />
+      <ScrollView
+        className="flex-1"
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Welcome Section */}
+        <View
+          className="px-6 py-8 bg-white dark:bg-gray-800 border-b border-gray-100 dark:border-gray-700 mb-6"
+          style={{
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.1,
+            shadowRadius: 2,
+          }}
         >
-          Welcome back,
-        </Text>
-        <Text className="text-3xl font-pbold" style={{ color: colors.primary }}>
-          {user?.name}
-        </Text>
-      </View>
+          <Text className="text-base text-gray-500 dark:text-gray-400 mb-2">
+            Welcome back,
+          </Text>
+          <Text className="text-3xl font-bold text-gray-800 dark:text-white mb-2">
+            {user?.name}
+          </Text>
+          
+          {/* Added email and role */}
+          <Text className="text-sm text-gray-500 dark:text-gray-400 mb-1">
+            {user?.email}
+          </Text>
+          <Text className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+            Role: {user?.role}
+          </Text>
 
-      {/* Status Card with Gradient */}
-      <View className="mx-6 rounded-2xl shadow-sm overflow-hidden">
-        <LinearGradient
-          colors={["#3b82f6", "#1d4ed8"]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          className="p-5"
-        >
-          <View className="flex-row justify-between items-center">
-            <View>
-              <Text
-                className="text-lg font-psemibold"
-                style={{ color: "white" }}
-              >
-                Account Status
-              </Text>
-              <Text
-                className="text-sm font-pmedium mt-1"
-                style={{ color: "rgba(255,255,255,0.8)" }}
-              >
-                {user?.role}
-              </Text>
-            </View>
+          {/* Status Badge */}
+          <View className="self-start">
             <View
-              className="px-4 py-2 rounded-full"
-              style={{
-                backgroundColor: "rgba(255,255,255,0.15)",
-              }}
+              className={`px-4 py-2 rounded-full ${
+                user?.status === "active"
+                  ? "bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800"
+                  : "bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800"
+              }`}
             >
-              <Text className="font-pmedium" style={{ color: "white" }}>
+              <Text
+                className={`font-medium ${
+                  user?.status === "active"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
+                }`}
+              >
                 {user?.status === "active" ? "Active" : "Inactive"}
               </Text>
             </View>
           </View>
-        </LinearGradient>
-      </View>
-
-      {/* Quick Actions Header */}
-      <Text
-        className="text-xl font-psemibold px-6 mt-8 mb-4"
-        style={{ color: colors.text }}
-      >
-        Quick Actions
-      </Text>
-
-      <ScrollView className="px-6 flex-1" showsVerticalScrollIndicator={false}>
-        {/* Navigation Cards with Gradients */}
-        <View className="flex-row flex-wrap justify-between">
-          {navigationCards.map((card, index) => (
-            <TouchableOpacity
-              key={index}
-              className="w-[48%] rounded-2xl mb-4 overflow-hidden"
-              style={{
-                shadowColor: card.gradientColors[0],
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 8,
-                elevation: 3,
-              }}
-              onPress={() => router.push(card.route)}
-            >
-              <LinearGradient
-                colors={card.gradientColors}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                className="p-5"
-              >
-                <View
-                  className="w-12 h-12 rounded-full items-center justify-center mb-4"
-                  style={{ backgroundColor: "rgba(255,255,255,0.15)" }}
-                >
-                  <Image
-                    source={card.icon}
-                    className="w-6 h-6"
-                    style={{ tintColor: "white" }}
-                  />
-                </View>
-                <Text
-                  className="text-lg font-psemibold mb-1"
-                  style={{ color: "white" }}
-                >
-                  {card.title}
-                </Text>
-                <Text
-                  className="text-sm font-pmedium"
-                  style={{ color: "rgba(255,255,255,0.8)" }}
-                >
-                  {card.description}
-                </Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          ))}
         </View>
 
-        {/* Stats Preview with Soft Background */}
-        <View
-          className="p-6 rounded-2xl mb-6 mt-4"
-          style={{
-            backgroundColor: "#f0f9ff", // Light blue background
-            shadowColor: colors.primary,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 3,
-          }}
-        >
-          <Text
-            className="text-lg font-psemibold mb-6"
-            style={{ color: colors.text }}
-          >
-            Quick Stats
+        {/* Stats Section */}
+        <View className="px-6 mb-8">
+          <Text className="text-xl font-bold text-gray-800 dark:text-white mb-5">
+            Overview
           </Text>
-          <View className="flex-row justify-between">
-            {[
-              {
-                label: "Fetched Leads",
-                value: stats.total,
-                color: "#3b82f6", // blue
-              },
-              {
-                label: "Pending",
-                value: stats.active,
-                color: "#f59e0b", // amber
-              },
-              {
-                label: "Converted",
-                value: stats.converted,
-                color: "#10b981", // emerald
-              },
-            ].map((stat, index) => (
-              <View key={index} className="items-center">
-                <Text
-                  className="text-3xl font-pbold"
-                  style={{ color: stat.color }}
-                >
-                  {stat.value}
-                </Text>
-                <Text
-                  className="text-sm font-pmedium mt-2"
-                  style={{ color: colors.secondary }}
-                >
-                  {stat.label}
-                </Text>
-              </View>
-            ))}
+          <View className="flex-row mx-[-4px]">
+            <StatCard
+              title="Total Leads"
+              value={stats.total}
+              color="text-blue-600 dark:text-blue-400"
+            />
+            <StatCard
+              title="Active"
+              value={stats.active}
+              color="text-amber-600 dark:text-amber-400"
+            />
+            <StatCard
+              title="Converted"
+              value={stats.converted}
+              color="text-emerald-600 dark:text-emerald-400"
+            />
           </View>
         </View>
 
-        {/* Spacer */}
-        <View style={{ height: 20 }} />
+        {/* Quick Actions */}
+        <View className="px-6 pb-8">
+          <Text className="text-xl font-bold text-gray-800 dark:text-white mb-5">
+            Quick Actions
+          </Text>
+          <View className="flex-row flex-wrap justify-between">
+            {navigationCards.map((card, index) => (
+              <QuickActionCard
+                key={index}
+                title={card.title}
+                description={card.description}
+                icon={card.icon}
+                onPress={() => router.push(card.route)}
+                gradientColors={card.gradientColors}
+              />
+            ))}
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );

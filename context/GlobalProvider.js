@@ -1,6 +1,15 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-const API_URL = "http://10.42.186.126:6000/api/users";
+
+// Centralize API configuration
+const API_CONFIG = {
+  BASE_URL: "https://crm-s1.amiigo.in/api",
+  ENDPOINTS: {
+    LOGIN: "/users/login",
+    REGISTER: "/users/register",
+    VERIFY_TOKEN: "/users/verify-token",
+  },
+};
 
 const GlobalContext = createContext();
 export const useGlobalContext = () => useContext(GlobalContext);
@@ -16,10 +25,28 @@ const GlobalProvider = ({ children }) => {
 
   const checkLoginStatus = async () => {
     try {
+      const token = await AsyncStorage.getItem("token");
       const userData = await AsyncStorage.getItem("user");
-      if (userData) {
-        setUser(JSON.parse(userData));
-        setIsLoggedIn(true);
+
+      if (token && userData) {
+        // Verify token with backend
+        const response = await fetch(
+          `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.VERIFY_TOKEN}`,
+          {
+            method: "GET",
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          setUser(JSON.parse(userData));
+          setIsLoggedIn(true);
+        } else {
+          // Token is invalid, clear storage
+          await AsyncStorage.multiRemove(["token", "user"]);
+        }
       }
     } catch (error) {
       console.log(error);
@@ -30,53 +57,85 @@ const GlobalProvider = ({ children }) => {
 
   const loginUser = async (email, password) => {
     try {
-      const response = await fetch(`${API_URL}/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
+      console.log("Attempting login with email:", email);
+
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.LOGIN}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password }),
+        }
+      );
+
+      console.log("Server response status:", response.status);
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message);
+        throw new Error(data.message || "Login failed");
       }
 
-      if (data.status === "inactive") {
-        throw new Error("Account is inactive. Please contact administrator.");
+      // Check if data exists
+      if (!data || !data.user) {
+        throw new Error("Invalid response: missing user data");
       }
 
-      await AsyncStorage.setItem("user", JSON.stringify(data));
-      setUser(data);
+      // Extract token from user object
+      const token = data.user.token;
+      const userData = { ...data.user };
+      delete userData.token; // Remove token from user data before storing
+
+      // Store data
+      const storageItems = [
+        ["token", token],
+        ["user", JSON.stringify(userData)],
+      ];
+
+      await AsyncStorage.multiSet(storageItems);
+      setUser(userData);
       setIsLoggedIn(true);
-      return data;
+
+      return {
+        ...data,
+        token,
+        user: userData,
+      };
     } catch (error) {
+      console.error("Login error details:", {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+      });
       throw error;
     }
   };
 
   const registerUser = async (formData) => {
     try {
-      const response = await fetch(`${API_URL}/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: formData.name,
-          email: formData.email,
-          password: formData.password,
-          phone: formData.phone,
-          role: "SuperAdmin",
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message);
+      const response = await fetch(
+        `${API_CONFIG.BASE_URL}${API_CONFIG.ENDPOINTS.REGISTER}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: formData.name,
+            email: formData.email,
+            password: formData.password,
+            phone: formData.phone,
+            role: formData.role || "COUNSELLOR",
+            status: "inactive",
+          }),
+        }
+      );
 
-      await AsyncStorage.setItem("user", JSON.stringify(data));
-      setUser(data);
-      setIsLoggedIn(true);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Registration failed");
+
+      // Don't store token or set user state since account needs approval
       return data;
     } catch (error) {
       throw error;
@@ -84,9 +143,14 @@ const GlobalProvider = ({ children }) => {
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem("user");
-    setUser(null);
-    setIsLoggedIn(false);
+    try {
+      await AsyncStorage.multiRemove(["token", "user"]);
+      setUser(null);
+      setIsLoggedIn(false);
+    } catch (error) {
+      console.error("Logout error:", error);
+      throw error;
+    }
   };
 
   return (

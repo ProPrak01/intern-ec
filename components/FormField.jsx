@@ -1,32 +1,42 @@
-import { View, Text, TextInput, TouchableOpacity,Image } from 'react-native'
-import React ,{useState} from 'react'
-import {icons} from '../constants'
-const FormField = ({title,value,placeholder,handleChangeText,otherStyles, ...props }) => {
-    const [showPassword,setShowPassword] = new useState(false)
+import { View, Text, TextInput } from "react-native";
+import React from "react";
+import { useTheme } from "../context/ThemeProvider";
+
+const FormField = ({
+  title,
+  value,
+  handleChangeText,
+  secureTextEntry,
+  keyboardType = "default",
+  autoCapitalize = "sentences",
+  containerStyle = "",
+  textStyle = "",
+}) => {
+  const { colors } = useTheme();
+
   return (
-    <View className={`space-y-2 ${otherStyles}`}>
-      <Text className="text-base text-gray-500 font-pmedium">{title}</Text>
-
-      <View className="border-2 border-[#cfcece] w-full h-16 px-4 bg-[#DFDFDF] rounded-2xl focus:border-secondary items-center flex-row" >
-    <TextInput
-        className="flex-1 text-[#3C3D37] font-psemibold"
+    <View className="w-full">
+      <Text 
+        className={`text-base mb-2 text-gray-700 dark:text-gray-300 ${textStyle}`}
+      >
+        {title}
+      </Text>
+      <TextInput
         value={value}
-        placeholder={placeholder}
-        placeholderTextColor="#7b7b8b"
         onChangeText={handleChangeText}
-        secureTextEntry = {title === 'Password' && !showPassword}
-    />
-
-    {title ==='Password' &&(
-      <TouchableOpacity onPress={()=>
-      setShowPassword(!showPassword)}>
-      <Image source={!showPassword ? icons.eye : icons.eyeHide} className="w-6 h-6" resizeMode='contain'/>
-        
-      </TouchableOpacity>
-    )} 
-      </View>
+        secureTextEntry={secureTextEntry}
+        keyboardType={keyboardType}
+        autoCapitalize={autoCapitalize}
+        className={`w-full px-4 py-3.5 rounded-xl border border-gray-200 
+          dark:border-gray-700 text-base text-gray-900 dark:text-white 
+          ${containerStyle}`}
+        placeholderTextColor={colors.isDark ? "#9ca3af" : "#6b7280"}
+        style={{
+          fontFamily: "Poppins-Regular",
+        }}
+      />
     </View>
-  )
-}
+  );
+};
 
-export default FormField
+export default FormField;

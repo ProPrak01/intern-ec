@@ -1,4 +1,13 @@
-import { View, Text, Image, ScrollView, Alert } from "react-native";
+import {
+  View,
+  Text,
+  Image,
+  ScrollView,
+  Alert,
+  StatusBar,
+  TouchableOpacity,
+  ActivityIndicator,
+} from "react-native";
 import React, { useState } from "react";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { images } from "../../constants";
@@ -19,65 +28,135 @@ const SignIn = () => {
   });
 
   const submit = async () => {
-    if (form.email === "" || form.password === "") {
+    // Validate fields
+    if (!form.email || !form.password) {
       return Alert.alert("Error", "Please fill in all fields");
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(form.email)) {
+      return Alert.alert("Error", "Please enter a valid email address");
     }
 
     setisSubmitted(true);
     try {
-      await loginUser(form.email, form.password);
-      Alert.alert("Success", "Signed in successfully");
-      router.replace("/home");
+      const response = await loginUser(form.email, form.password);
+
+      if (!response || !response.user) {
+        console.error("Invalid response structure:", response);
+        throw new Error("Received invalid response from server");
+      }
+
+      // if (response.user.status === "inactive") {
+      //   Alert.alert(
+      //     "Account Inactive",
+      //     "Your account is pending approval. Please contact the administrator.",
+      //     [{ text: "OK" }]
+      //   );
+      //   return;
+      // }
+
+      Alert.alert("Success", "Signed in successfully", [
+        { text: "OK", onPress: () => router.replace("/home") },
+      ]);
     } catch (error) {
-      Alert.alert("Error", error.message);
+      console.error("Sign in error:", {
+        message: error.message,
+        stack: error.stack,
+      });
+
+      let errorMessage = error.message;
+      if (error.message.includes("401")) {
+        errorMessage = "Invalid email or password";
+      } else if (error.message.includes("403")) {
+        errorMessage = "Account is inactive. Please contact administrator.";
+      } else if (error.message.includes("missing user data")) {
+        errorMessage = "Invalid server response. Please try again.";
+      } else if (
+        !error.message ||
+        error.message === "Invalid response from server"
+      ) {
+        errorMessage = "Unable to connect to server. Please try again later.";
+      }
+
+      Alert.alert("Error", errorMessage);
     } finally {
       setisSubmitted(false);
     }
   };
 
   return (
-    <SafeAreaView style={{ backgroundColor: colors.background, flex: 1 }}>
-      <ScrollView>
-        <View className="w-full justify-center min-h-[85vh] px-4 my-6">
-          <Image
-            source={images.logo}
-            resizeMode="contain"
-            className="w-[170px] h-[70px]"
-          />
-          <Text style={{ color: colors.text }} className="text-2xl font-psemibold mt-10">
-            Welcome Back
-          </Text>
-          <Text style={{ color: colors.secondary }} className="text-sm mt-2">
-            Please sign in to continue
-          </Text>
-          <FormField
-            title="Email"
-            value={form.email}
-            handleChangeText={(e) => setForm({ ...form, email: e })}
-            otherStyles="mt-7"
-            keyboardType="email-address"
-          />
+    <SafeAreaView className="flex-1 bg-white dark:bg-gray-900">
+      <StatusBar style={colors.isDark ? "light" : "dark"} />
+      <ScrollView className="flex-1">
+        <View className="flex-1 px-6 py-8 min-h-screen">
+          {/* Logo Section */}
+          <View className="mb-12">
+            <Image
+              source={images.logo}
+              resizeMode="contain"
+              className="w-[170px] h-[70px]"
+            />
+          </View>
 
-          <FormField
-            title="Password"
-            value={form.password}
-            handleChangeText={(e) => setForm({ ...form, password: e })}
-            otherStyles="mt-7"
-          />
-          <CustomButton
-            title="Sign In"
-            handlePress={submit}
-            containerSyles="mt-7"
-            isLoading={isSubmitted}
-          />
-          <View className="justify-center pt-5 flex-row gap-2">
-            <Text style={{ color: colors.secondary }} className="text-lg">
-              Don't have account?
+          {/* Header Section */}
+          <View className="mb-10">
+            <Text className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+              Welcome Back
+            </Text>
+            <Text className="text-base text-gray-600 dark:text-gray-400">
+              Please sign in to continue
+            </Text>
+          </View>
+
+          {/* Form Section */}
+          <View className="space-y-6">
+            <FormField
+              title="Email"
+              value={form.email}
+              handleChangeText={(e) => setForm({ ...form, email: e })}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              containerStyle="bg-gray-50 dark:bg-gray-800"
+              textStyle="text-gray-900 dark:text-white"
+            />
+
+            <FormField
+              title="Password"
+              value={form.password}
+              handleChangeText={(e) => setForm({ ...form, password: e })}
+              secureTextEntry
+              containerStyle="bg-gray-50 dark:bg-gray-800"
+              textStyle="text-gray-900 dark:text-white"
+            />
+          </View>
+
+          {/* Action Buttons */}
+          <View className="mt-8">
+            <TouchableOpacity
+              onPress={submit}
+              disabled={isSubmitted}
+              className="w-full bg-blue-600 dark:bg-blue-500 py-4 rounded-xl active:opacity-80"
+            >
+              {isSubmitted ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text className="text-white text-center font-semibold text-lg">
+                  Sign In
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
+
+          {/* Footer Links */}
+          <View className="flex-row justify-center items-center mt-6 space-x-2">
+            <Text className="text-gray-600 dark:text-gray-400 text-base">
+              Don't have an account?
             </Text>
             <Link
               href="/sign-up"
-              style={{ color: colors.text }}
-              className="text-lg font-psemibold"
+              className="text-blue-600 dark:text-blue-400 font-semibold text-base"
             >
               Sign Up
             </Link>

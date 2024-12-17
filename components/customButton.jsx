@@ -1,17 +1,34 @@
-import { View, Text ,TouchableOpacity} from 'react-native'
-import React from 'react'
+import { Text, TouchableOpacity, ActivityIndicator } from "react-native";
+import React from "react";
 
-const CustomButton = ({ title ,handlePress,containerSyles,textStyles, isLoading}) => {
-  
+const CustomButton = ({
+  title,
+  handlePress,
+  isLoading = false,
+  disabled = false,
+  className = "",
+  textClassName = "",
+}) => {
   return (
-      <TouchableOpacity 
+    <TouchableOpacity
       onPress={handlePress}
-      activeOpacity={0.7}
-      className={`bg-[#3C3D37] rounded-xl min-h-[62px] justify-center items-center ${containerSyles} ${isLoading ? 'opacity-50':''}`}
-      disabled={isLoading}>
-        <Text className={`text-[#ECDFCC] font-psemibold text-lg ${textStyles}`}>{title}</Text>
-      </TouchableOpacity>
-  )
-}
+      disabled={isLoading || disabled}
+      className={`w-full items-center justify-center 
+        ${isLoading || disabled ? 'opacity-70' : 'active:opacity-80'} 
+        ${className}`}
+    >
+      {isLoading ? (
+        <ActivityIndicator size="small" color="#fff" />
+      ) : (
+        <Text 
+          className={`text-center ${textClassName}`}
+          style={{ fontFamily: "Poppins-SemiBold" }}
+        >
+          {title}
+        </Text>
+      )}
+    </TouchableOpacity>
+  );
+};
 
-export default CustomButton
+export default CustomButton;
